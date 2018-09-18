@@ -5,23 +5,23 @@ import CardSection from './felles/CardSection';
 import Button from './felles/Button';
 
 
-const StationDetails = ({ stations, handleClick, activeStations }) => {
+const StationDetails = ({ station, handleClick, activeStations, activeStationNames }) => {
   const { headerTextStyle, leftPartStyle, rightPartStyle, pressedStyle, buttonStyle } = styles;
 
   return (
     <Card style={{ flex: 1, flexDirection: 'row' }}>
       <CardSection style={leftPartStyle}>
         <Text style={headerTextStyle}>
-          {stations.name}
+          {station.name}
         </Text>
         <Text>
-        Free bikes: {stations.free_bikes}
+        Free bikes: {station.free_bikes}
         </Text>
       </CardSection>
       <CardSection style={rightPartStyle} >
         <Button
-          onPress={() => handleClick(stations.name)}
-          style={activeStations.includes(stations.name) ? pressedStyle : buttonStyle}
+          onPress={() => handleClick(station)}
+          style={activeStationNames.includes(station.name) ? pressedStyle : buttonStyle}
         >
            Abonner
         </Button>
