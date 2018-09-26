@@ -1,4 +1,6 @@
+/* eslint-disable max-len */
 import React from 'react';
+import _ from 'lodash';
 import { Text } from 'react-native';
 import Card from './felles/Card';
 import CardSection from './felles/CardSection';
@@ -7,33 +9,58 @@ import Button from './felles/Button';
 
 const StationDetails = ({ station, handleClick, activeStations, activeStationNames }) => {
   const { headerTextStyle, leftPartStyle, rightPartStyle, pressedStyle, buttonStyle } = styles;
+  //Bruke dette forholdstallet til dynamisk styling, ser ikke bra ut med bottomborder, noe annet?
+  //const forhold = 10 * ((_.toInteger(station.free_bikes) / (_.toInteger(station.extra.slots))));
 
-  return (
-    <Card style={{ flex: 1, flexDirection: 'row' }}>
-      <CardSection style={leftPartStyle}>
-        <Text style={headerTextStyle}>
-          {station.name}
-        </Text>
-        <Text>
-        Free bikes: {station.free_bikes}
-        </Text>
-      </CardSection>
-      <CardSection style={rightPartStyle} >
-        <Button
-          onPress={() => handleClick(station)}
-          style={activeStationNames.includes(station.name) ? pressedStyle : buttonStyle}
-        >
-           Abonner
-        </Button>
-      </CardSection>
+  if (activeStationNames.includes(station.name)) {
+    return (
+      <Card style={{ flex: 1, flexDirection: 'row' }}>
+        <CardSection style={leftPartStyle}>
+          <Text style={headerTextStyle}>
+            {station.name}
+          </Text>
+          <Text>
+          Free bikes: {station.free_bikes}
+          </Text>
+        </CardSection>
+        <CardSection style={rightPartStyle} >
+          <Button
+            onPress={() => handleClick(station)}
+            style={pressedStyle}
+          >
+             Myas
+          </Button>
+        </CardSection>
 
-    </Card>
-  );
+      </Card>
+    );
+  } return (
+      <Card style={{ flex: 1, flexDirection: 'row' }}>
+        <CardSection style={leftPartStyle}>
+          <Text style={headerTextStyle}>
+            {station.name}
+          </Text>
+          <Text>
+          Free bikes: {station.free_bikes}
+          </Text>
+        </CardSection>
+        <CardSection style={rightPartStyle} >
+          <Button
+            onPress={() => handleClick(station)}
+            style={buttonStyle}
+          >
+             Abonner
+          </Button>
+        </CardSection>
+
+      </Card>
+    );
 };
 
 const styles = {
   textStyle: {
-    fontSize: 14
+    fontSize: 14,
+    opacity: 1
   },
   leftPartStyle: {
     flex: 3,
@@ -44,7 +71,10 @@ const styles = {
     flex: 1
   },
   pressedStyle: {
-    backgroundColor: 'green',
+    backgroundColor: '#007aff',
+    fontWeight: '900',
+    color: 'white'
+
   },
   headerTextStyle: {
     fontSize: 18

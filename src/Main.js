@@ -1,7 +1,8 @@
+/* eslint-disable max-len */
 import React, { Component } from 'react';
 import axios from 'axios';
 import _ from 'lodash';
-import { ScrollView } from 'react-native';
+import { ScrollView, AsyncStorage } from 'react-native';
 import StationDetails from './StationDetails';
 
 
@@ -12,64 +13,88 @@ class Main extends Component {
     //Dette er nødvendig pga. objektene i activeStations bytter minneallokasjon,
     //og kan derfor ikke sjekkes direkte mot hverandre,
     //Hva med _.isEqual?
-    this.state = { stations: [], activeStations: [], firstLaunch: true, activeStationNames: [] };
+    this.state = { stations: [], activeStations: [], activeStationNames: [] };
     this.handleClick = this.handleClick.bind(this);
+    AsyncStorage.clear();
+    axios.get('https://api.citybik.es/v2/networks/trondheim-bysykkel')
+      .then(response => this.setState({ stations: response.data.network.stations }))
+        .catch(err => console.log('Error: ', err));
   }
 
   componentDidMount() {
-    if (this.state.firstLaunch) {
-      axios.get('https://api.citybik.es/v2/networks/trondheim-bysykkel')
-        .then(response => this.setState({ stations: response.data.network.stations,
-          firstLaunch: false }));
-    }
-
     setInterval(() => {
       axios.get('https://api.citybik.es/v2/networks/trondheim-bysykkel')
-        .then(response => this.setState({ stations: response.data.network.stations }));
+        .then(response => this.setState({
+          stations: response.data.network.stations })).catch(err => console.log('Error: ', err));
+        }, 5000);
+    setInterval(() => {
+      this.setStations();
+      //Setter stasjonene hvert 5 minutt.
+    }, 300000);
+    setInterval(() => {
+      this.getStations();
+      /*Kaller getStations hvert 5 sek. getStations kaller på sendPush (burde navngis skikkelig)
+      som sjekker om stasjonene (satt hvert 5 minutt av setstations) har noen forskjell ifra actStation sine verdier
+      Altså om: result.free_bikes er ulike actStation.free_bikes
+      */
     }, 5000);
   }
-  //Kalles hvert 5 sek, kaller på alertSubs, som kaller på sendPush.
-  componentDidUpdate(prevProps, prevState, snapshot) {
-    this.alertSubs(prevProps, prevState, snapshot);
+
+  setStations() {
+    const { stations } = this.state;
+    for (const station of stations) {
+      const obj = {
+        name: station.name,
+        free_bikes: station.free_bikes,
+        empty_slots: station.empty_slots,
+        id: station.id
+      };
+      AsyncStorage.setItem(obj.id, JSON.stringify(obj));
+    }
   }
 
-  alertSubs() { //Or few bikes
-    const { activeStations, stations } = this.state;
+
+  getStations() {
+    const { activeStations } = this.state;
     for (const actStation of activeStations) {
-      for (const station of stations) {
-        if (_.isEqual(actStation, station)) {
-          const freeBikes = _.toInteger(actStation.free_bikes);
-          const emptySlots = _.toInteger(actStation.empty_slots);
-          this.sendPush(freeBikes, emptySlots, actStation, station);
-        }
-      }
+      AsyncStorage.getItem(actStation.id, (err, result) => {
+        const parsed = JSON.parse(result);
+        this.sendPush(parsed, actStation);
+      });
     }
   }
 
-  sendPush(freeBikes, emptySlots, actStation, station) {
+  sendPush(result, actStation) {
+    const { name, free_bikes: freeBikesNow, empty_slots: emptySlotsNow } = actStation;
+    const { free_bikes: freeBikesPrev, empty_slots: emptySlotsPrev } = result;
+    //Test
+    if ((freeBikesPrev - freeBikesNow) > 0) {
+      console.log(freeBikesPrev - freeBikesNow);
+    }
     //Pushwarsler må legges inn i elif'ene her, bruker console.log inntil videre.
-    if (_.isEqual(freeBikes, 0)) {
-      console.log('Eii, nå er det ingen sykler igjen på', actStation.name);
-    } else if (_.isEqual(freeBikes, 1)) {
-      console.log('Det er kun ', station.free_bikes, ' sykkel igjen på ', actStation.name);
-      //Denne variabelen bør kunne settes av brukeren,
-      //slik at de selv kan bestemme hvor tidlig de vil ha beskjed.
-    } else if (freeBikes < 6) {
-      console.log('Det er kun ', station.free_bikes, ' sykler igjen på ', actStation.name);
-    } else if (_.isEqual(emptySlots, 0)) {
-      console.log('Det er nå fullt på ', actStation.name, '.');
+    //I hver av if-elsene er vi nødt til å sette stasjonene igjen
+    //(viktig å bemerke seg at dette ikke er i state, men med AsyncStorage)
+    //fordi vi nå er oppdatert på endringen. Om denne ikke settes, vil vi oppdateres på forskjellen
+    //mellom verdiene i result og actstations regelmessig,
+    //helt til funksjonen kalles på nytt i componentDidMount.
+    if (_.isEqual(freeBikesNow, 0) && (freeBikesPrev > 0)) {
+      console.log('Eii, nå er det ingen sykler igjen på', name);
+      console.log(freeBikesNow, freeBikesPrev);
+      this.setStations();
+    } else if (_.isEqual(freeBikesNow, 1) && freeBikesPrev > 1) {
+      console.log('Det er kun ', freeBikesNow, ' sykkel igjen på ', name);
+      console.log(freeBikesNow, freeBikesPrev);
+      this.setStations();
+    } else if ((freeBikesNow < 6) && (freeBikesPrev > 5)) {
+      console.log('Det er kun ', freeBikesNow, ' sykler igjen på ', name);
+      console.log(freeBikesNow, freeBikesPrev);
+      this.setStations();
+    } else if (_.isEqual(emptySlotsNow, 0) && (emptySlotsPrev > 0)) {
+      console.log('Det er nå fullt på ', name, '.');
+      console.log(freeBikesNow, freeBikesPrev);
+      this.setStations();
     }
   }
-    //const felles = activeStations.filter(value => stations.includes(value));
-
-    //Finne felles med stations-arrayet, trekke ut disse objektene, skaffe antallet sykler
-    //hvis noen er lik null, vil det si at det skal sendes pushvarsler.
-    //Hvis denne funksjonen kjøres ved scrolling, skal det endres farge på selve stationdetails,
-    //hvis funksjonen blir callet fordi det har gått fem minutter siden sist oppdatering
-    //(enten fem minutter siden sist drag-to-refresh,
-    //eller at det er fem minutter siden sist automagisk
-    //oppdatering - dette kan nok fort bli slitsomt,
-    //kanskje dette kun er funksjon i pushIfBeingFIlled.
 
   handleClick(station) {
     const { activeStations, activeStationNames } = this.state;
@@ -91,10 +116,11 @@ class Main extends Component {
     return this.state.stations.map((stations) =>
       <StationDetails
         activeStations={this.state.activeStations}
+        activeStationNames={this.state.activeStationNames}
         handleClick={this.handleClick}
         key={stations.id}
         station={stations}
-        activeStationNames={this.state.activeStationNames}
+        prevStation={this.state.returnStation}
       >
           {stations.name}
       </StationDetails>
