@@ -1,13 +1,13 @@
 /* eslint-disable max-len */
 import React from 'react';
-import _ from 'lodash';
+//import _ from 'lodash';
 import { Text } from 'react-native';
 import Card from './felles/Card';
 import CardSection from './felles/CardSection';
 import Button from './felles/Button';
 
 
-const StationDetails = ({ station, handleClick, activeStations, activeStationNames }) => {
+const StationDetails = ({ station, handleClick, activeStationNames }) => {
   const { headerTextStyle, leftPartStyle, rightPartStyle, pressedStyle, buttonStyle } = styles;
   //Bruke dette forholdstallet til dynamisk styling, ser ikke bra ut med bottomborder, noe annet?
   //const forhold = 10 * ((_.toInteger(station.free_bikes) / (_.toInteger(station.extra.slots))));

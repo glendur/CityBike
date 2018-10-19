@@ -2,7 +2,7 @@
 import React, { Component } from 'react';
 import axios from 'axios';
 import _ from 'lodash';
-import { ScrollView, AsyncStorage } from 'react-native';
+import { ScrollView } from 'react-native';
 import StationDetails from './StationDetails';
 
 
@@ -13,19 +13,34 @@ class Main extends Component {
     //Dette er nødvendig pga. objektene i activeStations bytter minneallokasjon,
     //og kan derfor ikke sjekkes direkte mot hverandre,
     //Hva med _.isEqual?
-    this.state = { stations: [], activeStations: [], activeStationNames: [] };
+    this.state = { stations: [], activeStations: [], activeStationNames: [], savedStations: {}, testSuite: true };
     this.handleClick = this.handleClick.bind(this);
-    AsyncStorage.clear();
     axios.get('https://api.citybik.es/v2/networks/trondheim-bysykkel')
-      .then(response => this.setState({ stations: response.data.network.stations }))
-        .catch(err => console.log('Error: ', err));
+      .then(response => {
+        if (!this.state.testSuite) {
+          this.setState({
+            stations: response.data.network.stations
+           });
+           this.setStations();
+        }
+        if (this.state.testSuite) {
+          this.setState({
+            stations: response.data.network.stations,
+            activeStations: response.data.network.stations
+           });
+           this.setStations();
+        }
+      }
+    )
+        .catch(err => console.log('Errår: ', err));
   }
 
   componentDidMount() {
     setInterval(() => {
       axios.get('https://api.citybik.es/v2/networks/trondheim-bysykkel')
         .then(response => this.setState({
-          stations: response.data.network.stations })).catch(err => console.log('Error: ', err));
+          stations: response.data.network.stations }))
+          .catch(err => err);
         }, 5000);
     setInterval(() => {
       this.setStations();
@@ -41,36 +56,37 @@ class Main extends Component {
   }
 
   setStations() {
-    const { stations } = this.state;
+    console.log('Setstations called.', new Date());
+    const { stations, activeStations } = this.state;
+    const savedStationsEditable = new Map();
+    const activeStationsEditable = activeStations;
     for (const station of stations) {
-      const obj = {
-        name: station.name,
-        free_bikes: station.free_bikes,
-        empty_slots: station.empty_slots,
-        id: station.id
-      };
-      AsyncStorage.setItem(obj.id, JSON.stringify(obj));
+      savedStationsEditable.set(station.id, this.objectify(station));
+      const index = activeStationsEditable.findIndex((obj => obj.id === station.id));
+      if (index !== -1) {
+        activeStationsEditable[index].free_bikes = station.free_bikes;
+        activeStationsEditable[index].empty_slots = station.empty_slots;
+      }
     }
+    this.setState({
+      savedStations: savedStationsEditable,
+      activeStations: activeStationsEditable
+     });
   }
 
 
   getStations() {
-    const { activeStations } = this.state;
+    const { activeStations, stations } = this.state;
     for (const actStation of activeStations) {
-      AsyncStorage.getItem(actStation.id, (err, result) => {
-        const parsed = JSON.parse(result);
-        this.sendPush(parsed, actStation);
-      });
+      const result = stations.find(station => station.id === actStation.id);
+      this.sendPush(result, actStation);
     }
   }
+
 
   sendPush(result, actStation) {
     const { name, free_bikes: freeBikesNow, empty_slots: emptySlotsNow } = actStation;
     const { free_bikes: freeBikesPrev, empty_slots: emptySlotsPrev } = result;
-    //Test
-    if ((freeBikesPrev - freeBikesNow) > 0) {
-      console.log(freeBikesPrev - freeBikesNow);
-    }
     //Pushwarsler må legges inn i elif'ene her, bruker console.log inntil videre.
     //I hver av if-elsene er vi nødt til å sette stasjonene igjen
     //(viktig å bemerke seg at dette ikke er i state, men med AsyncStorage)
@@ -96,6 +112,16 @@ class Main extends Component {
     }
   }
 
+  objectify(station) {
+    const obj = {
+      free_bikes: station.free_bikes,
+      empty_slots: station.empty_slots,
+      name: station.name,
+      time: new Date()
+    };
+    return obj;
+  }
+
   handleClick(station) {
     const { activeStations, activeStationNames } = this.state;
     const activeStationsEditable = activeStations;
@@ -107,8 +133,10 @@ class Main extends Component {
         activeStationsEditable.splice(activeStationsEditable.indexOf(station), 1);
         activeStationNamesEditable.splice(activeStationNamesEditable.indexOf(station.name), 1);
       }
-      this.setState({ activeStations: activeStationsEditable,
-         activeStationNames: activeStationNamesEditable });
+      this.setState({
+        activeStations: activeStationsEditable,
+        activeStationNames: activeStationNamesEditable
+       });
     }
 
 
